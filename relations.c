@@ -218,12 +218,6 @@ void relationInit(Relations *g)
 		fprintf(stderr,"ERREUR MALLOC");
 		exit(1);
 	}
-	(*g)->liste=(listeg)malloc(sizeof(struct s_node));
-	if(((*g)->liste)==NULL)
-	{
-		fprintf(stderr,"ERREUR MALLOC");
-		exit(1);
-	}
 }
 void relationFree(Relations *g)
 {
