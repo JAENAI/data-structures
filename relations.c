@@ -279,7 +279,7 @@ void adjRelation(Relations g, char *nom1, char *nom2, rtype id)
 {
 	Relations tmp=g,tmp1=g;
 	Entite a,b;
-	while(tmp->liste!=NULL)
+	while(tmp->liste->suiv!=NULL)
 	{
 		if((compSommet((void *)(tmp->liste->val),(void *)nom1))==0)
 		{
@@ -291,7 +291,7 @@ void adjRelation(Relations g, char *nom1, char *nom2, rtype id)
 		}
 		tmp->liste=tmp->liste->suiv;
 	}
-	while(tmp1->liste!=NULL)
+	while(tmp1->liste->suiv!=NULL)
 	{
 		if((compSommet((void *)(tmp1->liste->val),(void *)nom1))==0)
 		{
