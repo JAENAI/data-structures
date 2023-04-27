@@ -208,7 +208,7 @@ Arc nouvArc(Entite e, rtype type)
 	}
 	a->t=type;
 	a->x=e;
-	return NULL;
+	return a;
 }
 void relationInit(Relations *g)
 {
@@ -221,7 +221,7 @@ void relationInit(Relations *g)
 }
 void relationFree(Relations *g)
 {
-	while((*g)->liste->suiv!=NULL)
+	while((*g)->liste!=NULL)
 	{
 		while(((Sommet)((*g)->liste->val))->larcs!=NULL)
 		{
@@ -273,7 +273,7 @@ void adjRelation(Relations g, char *nom1, char *nom2, rtype id)
 {
 	Relations tmp=g,tmp1=g;
 	Entite a,b;
-	while(tmp->liste->suiv!=NULL)
+	while(tmp->liste!=NULL)
 	{
 		if((compSommet((void *)(tmp->liste->val),(void *)nom1))==0)
 		{
@@ -285,7 +285,7 @@ void adjRelation(Relations g, char *nom1, char *nom2, rtype id)
 		}
 		tmp->liste=tmp->liste->suiv;
 	}
-	while(tmp1->liste->suiv!=NULL)
+	while(tmp1->liste!=NULL)
 	{
 		if((compSommet((void *)(tmp1->liste->val),(void *)nom1))==0)
 		{
@@ -311,16 +311,55 @@ void adjRelation(Relations g, char *nom1, char *nom2, rtype id)
 // 4.1 listes de relations
 listeg en_relation(Relations g, char *x)
 {
+	Relations tmp=g;
+	while(tmp->liste!=NULL)
+	{
+		if((compSommet((void*)(tmp->liste->val),(void*)x))==0)
+		{
+			return ((Sommet)(tmp->liste->val))->larcs;
+		}
+		tmp->liste=tmp->liste->suiv;
+	}
 	return NULL;
 }
 listeg chemin2(Relations g, char *x, char *y)
 {
-	return NULL;
+	listeg new=NULL;
+	listeg rx=en_relation(g,x);
+	listeg ry=en_relation(g,y);
+	while(rx!=NULL)
+	{
+		listeg tmp=ry;
+		while(tmp!=NULL)
+		{
+			char * string=((Arc)(tmp->val))->x->nom;
+			if((compEntite((void*)(((Arc)(rx->val))->x),(void*)string)==0)
+					&&(compEntite((void*)(((Arc)(rx->val))->x),(void*)x)!=0))
+
+			{
+				new=adjtete(new,(void*)(((Arc)(tmp->val))->x));
+			}
+			tmp=tmp->suiv;
+		}
+		rx=rx->suiv;
+	}
+	return new;
 }
 // 4.2 verifier un lien de parente
 // PRE CONDITION: strcmp(x,y)!=0
 bool ont_lien_parente(Relations g, char *x, char *y)
 {
+        listeg tmp=en_relation(g,x);
+        while(tmp!=NULL)
+        {
+                if((compEntite((void*)(((Arc)(tmp->val))->x),(void*)y)==0)
+                                        &&(est_lien_parente(((Arc)(tmp->val))->t)==true))
+		{
+			return true;
+		}
+		tmp=tmp->suiv;
+        }
+
 	return false;
 }
 
@@ -329,35 +368,105 @@ bool ont_lien_parente(Relations g, char *x, char *y)
 // PRE CONDITION: strcmp(x,y)!=0
 bool se_connaissent(Relations g, char *x, char *y)
 {
+        listeg tmp=en_relation(g,x);
+	listeg tmp1=chemin2(g,x,y);
+        while(tmp!=NULL)
+        {
+                if((compEntite((void*)(((Arc)(tmp->val))->x),(void*)y)==0)
+				&&(est_lien_parente(((Arc)(tmp->val))->t)==true))
+		{
+
+			return true;
+                }
+		tmp=tmp->suiv;
+        }
+	while(tmp1!=NULL)
+	{
+		if((ont_lien_parente(g,x,((Entite)(tmp1->val))->nom)==true)
+				&&(ont_lien_parente(g,y,((Entite)(tmp1->val))->nom)==true))
+		{
+			return true;
+		}
+	}
 	return false;
 }
 // PRE CONDITION: les sommets correspondants � x et y sont de type PERSONNE
 // PRE CONDITION: strcmp(x,y)!=0
 bool se_connaissent_proba(Relations g, char *x, char *y)
 {
+	listeg new=chemin2(g,x,y);
+	if(se_connaissent(g,x,y)==true){
+		return false;
+	}
+	if(new!=NULL)
+	{
+		while(new!=NULL)
+		{
+			if((ont_lien_parente(g,x,((Entite)(new->val))->nom)==true)
+					&&(ont_lien_parente(g,y,((Entite)(new->val))->nom)==false))
+			{
+				return true;
+			}
+
+			if((ont_lien_parente(g,x,((Entite)(new->val))->nom)==false)
+                                        &&(ont_lien_parente(g,y,((Entite)(new->val))->nom)==true))
+			{
+				return true;
+			}
+
+		}
+	}
 	return false;
 }
 // PRE CONDITION: les sommets correspondants � x et y sont de type PERSONNE
 // PRE CONDITION: strcmp(x,y)!=0
 bool se_connaissent_peutetre(Relations g, char *x, char *y)
 {
+	if((se_connaissent(g,x,y)==false)
+		&&(se_connaissent_proba(g,x,y)==false)
+			&&(chemin2(g,x,y)!=NULL))
+	{
+		return true;
+	}
 	return false;
 }
 
 ////////////////////////////////////////
 // Exercice 5: Affichages
 
+char * toStringType(etype id)
+{
+        char*r[]=
+        {
+        "PERSONNE","OBJET","ADRESSE","VILLE"
+        };
+        if(id<=4)
+        {
+                return r[id-1];
+        }
+        return "";
+}
+
 void affichelg(listeg l, void(*aff)(void *))
 {
+	listeg tmp=l;
+	while(tmp!=NULL)
+	{
+		aff(tmp->val);
+		tmp=tmp->suiv;
+	}
 }
 
 void afficheEntite(void *x)
 {
+	printf("%s : %s\n",((Entite)(x))->nom,toStringType(((Entite)(x))->ident));
+
 }
 void afficheArc(void *x)
 {
+	printf("--%s-->",toStringRelation(((Arc)(x))->t));
+	afficheEntite((void*)(((Arc)(x))->x));
 }
-
 ////////////////////////////////////////
 // Exercice 6: Parcours
 void affiche_degre_relations(Relations r, char *x)
