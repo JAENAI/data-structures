@@ -143,7 +143,7 @@ listeg rech(listeg lst, void *x, int(*comp)(void *, void *))
 	{
 		if(comp(x,lst->val)==0)
 		{
-			adjtete(new,(void*)lst);
+			new=adjtete(new,(void*)lst);
 		}
 		lst=lst->suiv;
 	}
@@ -171,7 +171,7 @@ typedef struct s_arc {
 } *Arc;
 
 typedef struct s_relations {
-	struct s_node * liste;
+	listeg liste;
 } *Relations;
 
 //3.2 les constructeurs
@@ -212,12 +212,23 @@ Arc nouvArc(Entite e, rtype type)
 }
 void relationInit(Relations *g)
 {
+	if(g==NULL)
+	{
+		return;
+	}
 	(*g)=(Relations)malloc(sizeof(struct s_relations));
 	if((*g)==NULL)
 	{
 		fprintf(stderr,"ERREUR MALLOC");
 		exit(1);
 	}
+	(*g)->liste=(listeg)malloc(sizeof(struct s_node));
+	if((*g)->liste==NULL)
+	{
+		fprintf(stderr,"ERREUR MALLOC");
+		exit(1);
+	}
+	(*g)->liste=NULL;
 }
 void relationFree(Relations *g)
 {
@@ -231,6 +242,7 @@ void relationFree(Relations *g)
 		}
 		free(((Sommet)((*g)->liste->val))->x);
 		free(((Sommet)((*g)->liste->val))->larcs);
+		free((*g)->liste->val);
 		(*g)->liste=(*g)->liste->suiv;
 	}
 	free((*g)->liste);
@@ -261,9 +273,17 @@ void adjEntite(Relations g, char *nom, etype t)
 	{
 		relationInit(&g);
 	}
+	listeg tmp=rech(g->liste,(void *)nom,compEntite);
+	if(tmp!=NULL)
+	{
+		detruire(tmp);
+		printf("Entite existe déjà\n");
+		return;
+	}
 	Entite e=creerEntite(nom,t);
 	Sommet s=nouvSommet(e);
-	g->liste=adjqueue(g->liste,(void *)s);
+	g->liste=adjtete(g->liste,(void *)s);
+	detruire(tmp);
 
 }
 // PRE CONDITION: id doit �tre coh�rent avec les types des sommets correspondants � x et y
@@ -271,7 +291,8 @@ void adjEntite(Relations g, char *nom, etype t)
 // PRE CONDITION: strcmp(nom1,nom2)!=0
 void adjRelation(Relations g, char *nom1, char *nom2, rtype id)
 {
-	Relations tmp=g,tmp1=g;
+	Relations tmp=g;
+	Relations tmp1=g;
 	Entite a,b;
 	while(tmp->liste!=NULL)
 	{
@@ -290,16 +311,12 @@ void adjRelation(Relations g, char *nom1, char *nom2, rtype id)
 		if((compSommet((void *)(tmp1->liste->val),(void *)nom1))==0)
 		{
 			Arc new=nouvArc(b,id);
-			listeg n1=listegnouv();
-			n1=adjtete(n1,(void *)new);
-			((Sommet)(tmp1->liste->val))->larcs=adjqueue(((Sommet)(tmp1->liste->val))->larcs,(void*)n1);
+			((Sommet)(tmp1->liste->val))->larcs=adjtete(((Sommet)(tmp1->liste->val))->larcs,(void*)new);
 		}
 		if((compSommet((void *)(tmp1->liste->val),(void *)nom2))==0)
 		{
 			Arc new1=nouvArc(a,id);
-			listeg n2=listegnouv();
-			n2=adjtete(n2,(void *)new1);
-			((Sommet)(tmp1->liste->val))->larcs=adjqueue(((Sommet)(tmp1->liste->val))->larcs,(void*)n2);
+			((Sommet)(tmp1->liste->val))->larcs=adjtete(((Sommet)(tmp1->liste->val))->larcs,(void*)new1);
 		}
 		tmp1->liste=tmp1->liste->suiv;
 	}
@@ -375,7 +392,7 @@ bool se_connaissent(Relations g, char *x, char *y)
                 if((compEntite((void*)(((Arc)(tmp->val))->x),(void*)y)==0)
 				&&(est_lien_parente(((Arc)(tmp->val))->t)==true))
 		{
-
+			detruire(tmp1);
 			return true;
                 }
 		tmp=tmp->suiv;
@@ -385,9 +402,11 @@ bool se_connaissent(Relations g, char *x, char *y)
 		if((ont_lien_parente(g,x,((Entite)(tmp1->val))->nom)==true)
 				&&(ont_lien_parente(g,y,((Entite)(tmp1->val))->nom)==true))
 		{
+			detruire(tmp1);
 			return true;
 		}
 	}
+	detruire(tmp1);
 	return false;
 }
 // PRE CONDITION: les sommets correspondants � x et y sont de type PERSONNE
@@ -396,6 +415,7 @@ bool se_connaissent_proba(Relations g, char *x, char *y)
 {
 	listeg new=chemin2(g,x,y);
 	if(se_connaissent(g,x,y)==true){
+		detruire(new);
 		return false;
 	}
 	if(new!=NULL)
@@ -405,29 +425,35 @@ bool se_connaissent_proba(Relations g, char *x, char *y)
 			if((ont_lien_parente(g,x,((Entite)(new->val))->nom)==true)
 					&&(ont_lien_parente(g,y,((Entite)(new->val))->nom)==false))
 			{
+				detruire(new);
 				return true;
 			}
 
 			if((ont_lien_parente(g,x,((Entite)(new->val))->nom)==false)
                                         &&(ont_lien_parente(g,y,((Entite)(new->val))->nom)==true))
 			{
+				detruire(new);
 				return true;
 			}
 
 		}
 	}
+	detruire(new);
 	return false;
 }
 // PRE CONDITION: les sommets correspondants � x et y sont de type PERSONNE
 // PRE CONDITION: strcmp(x,y)!=0
 bool se_connaissent_peutetre(Relations g, char *x, char *y)
 {
+	listeg lst=chemin2(g,x,y);
 	if((se_connaissent(g,x,y)==false)
 		&&(se_connaissent_proba(g,x,y)==false)
-			&&(chemin2(g,x,y)!=NULL))
+			&&(lst!=NULL))
 	{
+		detruire(lst);
 		return true;
 	}
+	detruire(lst);
 	return false;
 }
 
