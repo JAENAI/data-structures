@@ -133,7 +133,10 @@ bool estvide(listeg lst)
 void detruire(listeg lst)
 {
 	while(lst!=NULL){
-		lst=suptete(lst);
+		listeg tmp=lst->suiv;
+		free(lst->val);
+		free(lst);
+		lst=tmp;
 	}
 }
 listeg rech(listeg lst, void *x, int(*comp)(void *, void *))
@@ -197,7 +200,7 @@ Sommet nouvSommet(Entite e)
 		exit(1);
 	}
 	s->x=e;
-	s->larcs=listegnouv();
+	s->larcs=NULL;
 	return s;
 }
 Arc nouvArc(Entite e, rtype type)
@@ -224,23 +227,25 @@ void relationInit(Relations *g)
 		fprintf(stderr,"ERREUR MALLOC");
 		exit(1);
 	}
-	(*g)->liste=(listeg)malloc(sizeof(struct s_node));
-	if((*g)->liste==NULL)
-	{
-		fprintf(stderr,"ERREUR MALLOC");
-		exit(1);
-	}
 	(*g)->liste=NULL;
 }
 void relationFree(Relations *g)
 {
-	while((Sommet)((*g)->liste)!=NULL)
+	while((*g)->liste!=NULL)
 	{
-		detruire(((Sommet)((*g)->liste->val))->larcs);
+		listeg tmp1=(*g)->liste->suiv;
 		free(((Sommet)((*g)->liste->val))->x);
-		(*g)->liste=(*g)->liste->suiv;
+		while(((Sommet)((*g)->liste->val))->larcs!=NULL)
+		{
+			listeg tmp=((Sommet)((*g)->liste->val))->larcs->suiv;
+			free(((Sommet)((*g)->liste->val))->larcs->val);
+			free(((Sommet)((*g)->liste->val))->larcs);
+			((Sommet)((*g)->liste->val))->larcs=tmp;
+		}
+		free((*g)->liste->val);
+		free((*g)->liste);
+		(*g)->liste=tmp1;
 	}
-	free((*g)->liste);
 	free((*g));
 }
 
@@ -280,10 +285,7 @@ void adjEntite(Relations g, char *nom, etype t)
 		tmp=tmp->suiv;
 	}
 	Entite e=creerEntite(nom,t);
-	Sommet s=nouvSommet(e);
-	g->liste=adjqueue(g->liste,(void *)s);
-	//detruire(tmp);
-
+	g->liste=adjtete(g->liste,(void *)nouvSommet(e));
 }
 
 // PRE CONDITION: id doit �tre coh�rent avec les types des sommets correspondants � x et y
@@ -366,7 +368,6 @@ listeg chemin2(Relations g, char *x, char *y)
 		if((est_dans_larcs(ry,string))==true)
 		{
 			Entite tmp=creerEntite(string,((Arc)(rx->val))->x->ident);
-			//new=adjtete(new,(void *)(((Arc)(rx->val))->x));
 			new=adjtete(new,(void*)tmp);
 		}
 		rx=rx->suiv;
@@ -382,9 +383,9 @@ bool ont_lien_parente(Relations g, char *x, char *y)
         {
 			if((compEntite((void*)(((Arc)(tmp->val))->x),(void*)y)==0)
 			&&(est_lien_parente(((Arc)(tmp->val))->t)==true))
-		{
-			return true;
-		}
+			{
+				return true;
+			}
 		tmp=tmp->suiv;
         }
 
@@ -396,18 +397,19 @@ bool ont_lien_parente(Relations g, char *x, char *y)
 // PRE CONDITION: strcmp(x,y)!=0
 bool se_connaissent(Relations g, char *x, char *y)
 {
-        listeg tmp=en_relation(g,x);
-	listeg tmp1=chemin2(g,x,y);
-        while(tmp!=NULL)
-        {
-                if((compEntite((void*)(((Arc)(tmp->val))->x),(void*)y)==0)
-				&&(est_lien_parente(((Arc)(tmp->val))->t)==true))
+    listeg tmp=en_relation(g,x);
+    while(tmp!=NULL)
+    {
+	    if((compEntite((void*)(((Arc)(tmp->val))->x),(void*)y)==0)
+				&&((est_lien_parente(((Arc)(tmp->val))->t)==true)
+				||(est_lien_professionel(((Arc)(tmp->val))->t)==true)
+				|| (est_lien_connaissance(((Arc)(tmp->val))->t)==true)))
 		{
-			detruire(tmp1);
 			return true;
-                }
-		tmp=tmp->suiv;
         }
+		tmp=tmp->suiv;
+    }
+	listeg tmp1=chemin2(g,x,y);
 	while(tmp1!=NULL)
 	{
 		if((ont_lien_parente(g,x,((Entite)(tmp1->val))->nom)==true)
@@ -416,19 +418,19 @@ bool se_connaissent(Relations g, char *x, char *y)
 			detruire(tmp1);
 			return true;
 		}
+		tmp1=suptete(tmp1);
 	}
-	detruire(tmp1);
 	return false;
 }
 // PRE CONDITION: les sommets correspondants � x et y sont de type PERSONNE
 // PRE CONDITION: strcmp(x,y)!=0
 bool se_connaissent_proba(Relations g, char *x, char *y)
 {
-	listeg new=chemin2(g,x,y);
-	if(se_connaissent(g,x,y)==true){
-		detruire(new);
+	if(se_connaissent(g,x,y)==true)
+	{
 		return false;
 	}
+	listeg new=chemin2(g,x,y);
 	if(new!=NULL)
 	{
 		while(new!=NULL)
@@ -446,10 +448,9 @@ bool se_connaissent_proba(Relations g, char *x, char *y)
 				detruire(new);
 				return true;
 			}
-
+			new=suptete(new);
 		}
 	}
-	detruire(new);
 	return false;
 }
 // PRE CONDITION: les sommets correspondants � x et y sont de type PERSONNE
@@ -502,13 +503,35 @@ void afficheEntite(void *x)
 void afficheArc(void *x)
 {
 	printf("--%s-->",toStringRelation(((Arc)(x))->t));
-	//printf("%d : \n",((Entite)(x))->ident);
 	afficheEntite((void *)(((Arc)(x))->x));
 }
 ////////////////////////////////////////
 // Exercice 6: Parcours
+void affiche_degre_relations_aux(Relations r,char *y,char *rest)
+{
+	listeg tmp=en_relation(r, y);
+	while(tmp!=NULL)
+	{
+		if(compEntite((void *)(((Arc)(tmp->val))->x),(void *)rest)!=0)
+		{
+			afficheEntite((void *)(((Arc)(tmp->val))->x));
+		}
+		tmp=tmp->suiv;
+	}
+}
 void affiche_degre_relations(Relations r, char *x)
 {
+	printf("%s\n",x);
+	printf("--1\n");
+	listeg tmp=en_relation(r, x);
+	affiche_degre_relations_aux(r,x,x);
+	printf("--2\n");
+	while(tmp!=NULL)
+	{
+		char *string=((Arc)(tmp->val))->x->nom;
+		affiche_degre_relations_aux(r,string,x);
+		tmp=tmp->suiv;
+	}
 }
 
 
