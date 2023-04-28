@@ -138,14 +138,15 @@ void detruire(listeg lst)
 }
 listeg rech(listeg lst, void *x, int(*comp)(void *, void *))
 {
+	listeg tmp=lst;
 	listeg new=listegnouv();
-	while(lst!=NULL)
+	while(tmp!=NULL)
 	{
 		if(comp(x,lst->val)==0)
 		{
-			new=adjtete(new,(void*)lst);
+			new=adjqueue(new,(void*)tmp);
 		}
-		lst=lst->suiv;
+		tmp=tmp->suiv;
 	}
 	return new;
 }
@@ -196,6 +197,7 @@ Sommet nouvSommet(Entite e)
 		exit(1);
 	}
 	s->x=e;
+	s->larcs=listegnouv();
 	return s;
 }
 Arc nouvArc(Entite e, rtype type)
@@ -232,17 +234,10 @@ void relationInit(Relations *g)
 }
 void relationFree(Relations *g)
 {
-	while((*g)->liste!=NULL)
+	while((Sommet)((*g)->liste)!=NULL)
 	{
-		while(((Sommet)((*g)->liste->val))->larcs!=NULL)
-		{
-			free(((Arc)(((Sommet)((*g)->liste->val))->larcs->val))->x);
-			free(((Sommet)((*g)->liste->val))->larcs->val);
-			((Sommet)((*g)->liste->val))->larcs=((Sommet)((*g)->liste->val))->larcs->suiv;
-		}
+		detruire(((Sommet)((*g)->liste->val))->larcs);
 		free(((Sommet)((*g)->liste->val))->x);
-		free(((Sommet)((*g)->liste->val))->larcs);
-		free((*g)->liste->val);
 		(*g)->liste=(*g)->liste->suiv;
 	}
 	free((*g)->liste);
@@ -273,52 +268,61 @@ void adjEntite(Relations g, char *nom, etype t)
 	{
 		relationInit(&g);
 	}
-	listeg tmp=rech(g->liste,(void *)nom,compEntite);
-	if(tmp!=NULL)
+	//listeg tmp=rech(g->liste,(void *)nom,compEntite);
+	listeg tmp=g->liste;
+	while(tmp!=NULL)
 	{
-		detruire(tmp);
-		printf("Entite existe déjà\n");
-		return;
+		if((compEntite((void *)(((Sommet)(tmp->val))->x),(void *)nom))==0)
+		{
+			printf("Entite existe déjà\n");
+			return;
+		}
+		tmp=tmp->suiv;
 	}
 	Entite e=creerEntite(nom,t);
 	Sommet s=nouvSommet(e);
-	g->liste=adjtete(g->liste,(void *)s);
-	detruire(tmp);
+	g->liste=adjqueue(g->liste,(void *)s);
+	//detruire(tmp);
 
 }
+
 // PRE CONDITION: id doit �tre coh�rent avec les types des sommets correspondants � x et y
 //                p.ex si x est de type OBJET, id ne peut pas etre une relation de parente
 // PRE CONDITION: strcmp(nom1,nom2)!=0
 void adjRelation(Relations g, char *nom1, char *nom2, rtype id)
 {
-	Relations tmp=g;
-	Relations tmp1=g;
+	//Entite a=tete(rech(g->liste,(void*)nom1,compSommet));
+	//Entite b=tete(rech(g->liste,(void*)nom2,compSommet));
+	listeg tmp=g->liste;
 	Entite a,b;
-	while(tmp->liste!=NULL)
+	while(tmp!=NULL)
 	{
-		if((compSommet((void *)(tmp->liste->val),(void *)nom1))==0)
+		if((compEntite((void *)(((Sommet)(tmp->val))->x),(void *)nom1))==0)
 		{
-			a=((Sommet)(tmp->liste->val))->x;
+			a=((Sommet)(tmp->val))->x;
 		}
-		if((compSommet((void *)(tmp->liste->val),(void *)nom2))==0)
+		if((compEntite((void *)(((Sommet)(tmp->val))->x),(void *)nom2))==0)
 		{
-			b=((Sommet)(tmp->liste->val))->x;
+			b=((Sommet)(tmp->val))->x;
 		}
-		tmp->liste=tmp->liste->suiv;
+		tmp=tmp->suiv;
 	}
-	while(tmp1->liste!=NULL)
+	//afficheEntite((void *)a);
+	//afficheEntite((void *)b);
+	listeg tmp1=g->liste;
+	while(tmp1!=NULL)
 	{
-		if((compSommet((void *)(tmp1->liste->val),(void *)nom1))==0)
+		if((compSommet((void *)(tmp1->val),(void *)nom1))==0)
 		{
 			Arc new=nouvArc(b,id);
-			((Sommet)(tmp1->liste->val))->larcs=adjtete(((Sommet)(tmp1->liste->val))->larcs,(void*)new);
+			((Sommet)(tmp1->val))->larcs=adjtete(((Sommet)(tmp1->val))->larcs,(void*)new);
 		}
-		if((compSommet((void *)(tmp1->liste->val),(void *)nom2))==0)
+		if((compSommet((void *)(tmp1->val),(void *)nom2))==0)
 		{
 			Arc new1=nouvArc(a,id);
-			((Sommet)(tmp1->liste->val))->larcs=adjtete(((Sommet)(tmp1->liste->val))->larcs,(void*)new1);
+			((Sommet)(tmp1->val))->larcs=adjtete(((Sommet)(tmp1->val))->larcs,(void*)new1);
 		}
-		tmp1->liste=tmp1->liste->suiv;
+		tmp1=tmp1->suiv;
 	}
 }
 
@@ -328,35 +332,42 @@ void adjRelation(Relations g, char *nom1, char *nom2, rtype id)
 // 4.1 listes de relations
 listeg en_relation(Relations g, char *x)
 {
-	Relations tmp=g;
-	while(tmp->liste!=NULL)
+	listeg tmp=g->liste;
+	while(tmp!=NULL)
 	{
-		if((compSommet((void*)(tmp->liste->val),(void*)x))==0)
+		if((compSommet((void*)(tmp->val),(void*)x))==0)
 		{
-			return ((Sommet)(tmp->liste->val))->larcs;
+			return ((Sommet)(tmp->val))->larcs;
 		}
-		tmp->liste=tmp->liste->suiv;
+		tmp=tmp->suiv;
 	}
 	return NULL;
 }
+bool est_dans_larcs(listeg lst,char *x)
+{
+	while(lst!=NULL)
+	{
+		if(compEntite((void*)(((Arc)(lst->val))->x),(void*)x)==0)
+		{
+			return true;
+		}
+		lst=lst->suiv;
+	}
+	return false;
+}
 listeg chemin2(Relations g, char *x, char *y)
 {
-	listeg new=NULL;
+	listeg new=listegnouv();
 	listeg rx=en_relation(g,x);
 	listeg ry=en_relation(g,y);
 	while(rx!=NULL)
 	{
-		listeg tmp=ry;
-		while(tmp!=NULL)
+		char * string=((Arc)(rx->val))->x->nom;
+		if((est_dans_larcs(ry,string))==true)
 		{
-			char * string=((Arc)(tmp->val))->x->nom;
-			if((compEntite((void*)(((Arc)(rx->val))->x),(void*)string)==0)
-					&&(compEntite((void*)(((Arc)(rx->val))->x),(void*)x)!=0))
-
-			{
-				new=adjtete(new,(void*)(((Arc)(tmp->val))->x));
-			}
-			tmp=tmp->suiv;
+			Entite tmp=creerEntite(string,((Arc)(rx->val))->x->ident);
+			//new=adjtete(new,(void *)(((Arc)(rx->val))->x));
+			new=adjtete(new,(void*)tmp);
 		}
 		rx=rx->suiv;
 	}
@@ -369,8 +380,8 @@ bool ont_lien_parente(Relations g, char *x, char *y)
         listeg tmp=en_relation(g,x);
         while(tmp!=NULL)
         {
-                if((compEntite((void*)(((Arc)(tmp->val))->x),(void*)y)==0)
-                                        &&(est_lien_parente(((Arc)(tmp->val))->t)==true))
+			if((compEntite((void*)(((Arc)(tmp->val))->x),(void*)y)==0)
+			&&(est_lien_parente(((Arc)(tmp->val))->t)==true))
 		{
 			return true;
 		}
@@ -491,7 +502,8 @@ void afficheEntite(void *x)
 void afficheArc(void *x)
 {
 	printf("--%s-->",toStringRelation(((Arc)(x))->t));
-	afficheEntite((void*)(((Arc)(x))->x));
+	//printf("%d : \n",((Entite)(x))->ident);
+	afficheEntite((void *)(((Arc)(x))->x));
 }
 ////////////////////////////////////////
 // Exercice 6: Parcours
