@@ -293,14 +293,23 @@ void adjEntite(Relations g, char *nom, etype t)
 // PRE CONDITION: strcmp(nom1,nom2)!=0
 void adjRelation(Relations g, char *nom1, char *nom2, rtype id)
 {
-	//Entite a=tete(rech(g->liste,(void*)nom1,compSommet));
-	//Entite b=tete(rech(g->liste,(void*)nom2,compSommet));
 	listeg tmp=g->liste;
 	Entite a,b;
 	while(tmp!=NULL)
 	{
 		if((compEntite((void *)(((Sommet)(tmp->val))->x),(void *)nom1))==0)
 		{
+			listeg chk=((Sommet)(tmp->val))->larcs;
+			while(chk!=NULL)
+			{
+				if ((compEntite((void*)(((Arc)(chk->val))->x),(void*)nom2)==0) 
+				&& (((Arc)(chk->val))->t==id))
+				{
+					fprintf(stderr,"Relation existe déjà");
+					exit(1);
+				}
+				chk=chk->suiv;
+			}
 			a=((Sommet)(tmp->val))->x;
 		}
 		if((compEntite((void *)(((Sommet)(tmp->val))->x),(void *)nom2))==0)
@@ -309,8 +318,6 @@ void adjRelation(Relations g, char *nom1, char *nom2, rtype id)
 		}
 		tmp=tmp->suiv;
 	}
-	//afficheEntite((void *)a);
-	//afficheEntite((void *)b);
 	listeg tmp1=g->liste;
 	while(tmp1!=NULL)
 	{
